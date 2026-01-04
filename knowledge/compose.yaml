@@ -1,0 +1,12 @@
+
+version: "3.9"
+
+services:
+  knowledge:
+    image: knowledge:0.0.1
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:h2:mem:knowledge-db-dev
+

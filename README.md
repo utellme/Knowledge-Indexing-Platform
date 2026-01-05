@@ -40,7 +40,7 @@ This repository contains Infrastructure-as-Code (Terraform) to deploy the Knowle
 ```bash
 cd knowledge
 ./mvnw clean package
-docker build -t knowledge:0.0.1 .
+docker build -t knowledge-devprod:1.0.0 .
 ```
 ### 2) Deploy infrastructure
 ```bash
@@ -55,10 +55,10 @@ AWS_REGION=us-east-1
 ECR_URL=$(terraform output -raw ecr_repository_url)
 
 aws ecr get-login-password --region $AWS_REGION \
- | docker login --username AWS --password-stdin ${ECR_URL%/*}
+ | docker login --username AWS --password-stdin $ECR_URL
 
-docker tag knowledge:0.0.1 $ECR_URL:0.0.1
-docker push $ECR_URL:0.0.1
+docker tag knowledge-devprod:1.0.0 $ECR_URL:1.0.0
+docker push $ECR_URL:1.0.0
 
 
 or run a scrpt

@@ -59,7 +59,7 @@ variable "memory" {
 
 variable "image_tag" {
   type    = string
-  default = "2.0.0"
+  default = "1.0.0"
 }
 
 variable "db_username" {

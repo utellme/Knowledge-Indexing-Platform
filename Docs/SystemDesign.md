@@ -43,7 +43,7 @@ Built with strict tenant isolation, robust security measures, and compliance-gra
     + Call cloud storage (S3) to access the file using GetObject(bucket, key). Authentication and decryption occur before the object is returned.
     + Normalize and chunk the text.
 9. Processing workers call the embedding service in batch to vectorize the chunked data.
-10. Processing workers update metadata and vector data into tenant-scoped vector db (& index) and metadata db. documents.status = INDEXED and job staged succeeded.
+10. Processing workers update metadata and vector data (Vector or Hybrid DB) into tenant-scoped vector db (& index) and metadata db. documents.status = INDEXED and job staged succeeded.
 11. Write audit events at each stage (received, uploaded, processed, indexed, failed, reprocessed).
 
 ### Query flow
@@ -51,7 +51,7 @@ Built with strict tenant isolation, robust security measures, and compliance-gra
 1. Client initiates a GET request to the Search API at /search?query.
 2. User authentication occurs, resolving tenant_id. A JWT token is generated containing user_id, tenant_id, and other data.
 3. Authorization (RBAC) service provides user-role-permission data to validate access to the Query Service API.
-4. The Query Service checks Redis for data before querying the Vector DB/Search.
+4. The Query Service checks Redis for data before querying the Vector DB/Hybrid.
 5. The Query Service sends the input text to an embedding model, which returns a vector.
 6. The Query Service transmits this vector to the Vector DB, which responds with chunk id, score, and metadata.
 7. The Query Service retrieves text and metadata from the Metadata DB.
@@ -267,25 +267,39 @@ Metadata Database: PostgreSQL
     + Schema changes require discipline (migrations, backward compatibility).
     + At high scale, hot tables may need splitting or read replicas.
 
-Search and Vector Capabilities (OpenSearch)
+Hybrid (Search and Vector Capabilities) / Vector DB
 + Supports semantic and keyword search, filtering, high concurrency, and low latency.
-+ Offers vector indexing, keyword search, filters, facets, highlighting, and scalable sharding.
-+ Combines hybrid search in one platform, simplifying query complexity.
-+ Tradeoffs
-    + Complex cluster tuning (shards, memory, indexing load).
-    + Index-per-tenant can cause explosion in index count.
-    + Shared index requires strict tenant query controls.
-    + Conclusion: Suitable default for hybrid search at scale when avoiding dedicated vector DB initially.
++ Provides vector indexing, keyword search, filters, facets, highlighting, and scalable sharding.
++ Integrates hybrid search in one platform, streamlining query processes.
++ Hybrid options include Postgres with pgvector or Opensearch.
++ Vector DB options include Pinecone or Weaviate.
++ Tradeoffs:
+    + Hybrid:
+        + Linear Weighted Scoring: Assign weights manually (e.g., 70% Vector, 30% Keyword), requiring normalization.
+        + Boolean Filtering: Use keyword search as a "hard filter" (WHERE clause), then sort with vector search among items with those keywords.
+    + Open Search vs Postgres (pgvector):
+        + Open Search:
+            + Highly scalable for large datasets and high query volumes, built for horizontal scaling.
+            + Integrates seamlessly with AWS services like DynamoDB.
+            + Downsides: Complex setup and management, needs integration with other datastores.
+        + Postgres:
+            + Familiar, easy to set up, manage, and cost-effective. No migration needed if already using Postgres.
+            + Embeds vector search into your primary relational database.
+            + Downsides: Less scalable than OpenSearch for very large workloads.
+    + Conclusion:
+        + Suitable default for large-scale hybrid search without dedicated vector DB initially. Use Postgres if already in use; otherwise, opt for OpenSearch for better scalability.
 
-Cache: Redis (ElastiCache)
-+ Acceleration for 10K concurrent queries:
-    + Caches popular tenant query results.
-    + Caches query embeddings.
+Cache: Redis/ElastiCache
++ Accelerates 10K concurrent queries:
+    + Stores popular tenant query results.Caches query embeddings.
     + Supports rate limiting counters (possibly at gateway).
-+ Tradeoffs
++ Tradeoffs:
     + Cache invalidation is complex but manageable with short TTLs and versioned keys.
     + Should not be relied upon as a primary data store.
-+ Conclusion: Not essential for MVP but valuable for consistent latency and cost efficiency at scale.
+    + Redis vs ElastiCache:
+        + ElastiCache - AWS managed service offering high availability, security, integration, and scaling, but at a higher cost and with less control.
+        + Redis - No vendor lock-in, supports advanced features, provides maximum control and multi-tenancy, but requires handling backups, scaling, patching, and security.
++ Conclusion: Not essential for MVP but helps ensure consistent latency and cost efficiency at scale. The choice between Redis and ElastiCache depends on the company's tech stack policy. If avoiding vendor lock-in, use Redis; otherwise, choose ElastiCache for easier management. I have used Redic more than ElastiCache.
 
 Audit Logging (S3 Object Lock + query index)
 + Ensures compliance with append-only, immutable, and tamper-evident logs retained over years and exportable per tenant.
